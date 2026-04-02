@@ -238,6 +238,10 @@ def webhook(**kwargs):
 			}
 		)
 		file_doc.save(ignore_permissions=True)
+
+		# Save EDocument again to trigger field detection (company, etc.) from attached XML
+		edocument.reload()
+		edocument.save(ignore_permissions=True)
 		frappe.db.commit()  # nosemgrep: Webhook must persist before returning
 
 		result = {"edocument": edocument.name, "document_id": document_id}
@@ -345,8 +349,10 @@ def poll_incoming_invoices(profile=None, company=None):
 					is_private=1,
 				)
 
-				# Set xml_file field on EDocument to the file URL
-				edocument.db_set("xml_file", file_doc.file_url, update_modified=False)
+				# Save EDocument to trigger field detection (company, etc.) from attached XML
+				edocument.reload()
+				edocument.xml_file = file_doc.file_url
+				edocument.save(ignore_permissions=True)
 				frappe.db.commit()
 
 				# Add comment with metadata
