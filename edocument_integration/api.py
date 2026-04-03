@@ -263,7 +263,7 @@ def webhook(**kwargs):
 
 
 @frappe.whitelist()
-def poll_incoming_invoices(profile=None, company=None):
+def poll_incoming_invoices(profile: str | None = None, company: str | None = None):
 	"""
 	Poll Recommand inbox for incoming invoices and create EDocument records.
 
