@@ -133,7 +133,7 @@ def get_edocument_integration_settings(profile, company=None):
 
 
 @frappe.whitelist()
-def transmit_edocument(edocument_name):
+def transmit_edocument(edocument_name: str):
 	# Transmit E-document using the configured integrator
 	try:
 		edocument_doc = frappe.get_doc("EDocument", edocument_name)
@@ -190,13 +190,11 @@ def transmit_edocument(edocument_name):
 		edocument_doc.add_comment(comment_type="Info", text="\n".join(parts))
 
 		# Set status to Transmission Successful and store reference ID
-		frappe.db.set_value(
-			"EDocument",
-			edocument_name,
-			{"status": "Transmission Successful", "error": None, "reference": transmission_id},
-			update_modified=False,
-		)
-		frappe.db.commit()
+		edocument_doc.reload()
+		edocument_doc.status = "Transmission Successful"
+		edocument_doc.error = None
+		edocument_doc.reference = transmission_id
+		edocument_doc.save()
 
 		return transmission_result
 	except frappe.ValidationError:
@@ -204,13 +202,10 @@ def transmit_edocument(edocument_name):
 		raise
 	except Exception as e:
 		# Set status to Transmission Failed
-		frappe.db.set_value(
-			"EDocument",
-			edocument_name,
-			{"status": "Transmission Failed", "error": str(e)},
-			update_modified=False,
-		)
-		frappe.db.commit()
+		edocument_doc.reload()
+		edocument_doc.status = "Transmission Failed"
+		edocument_doc.error = str(e)
+		edocument_doc.save()
 
 		frappe.log_error(
 			f"E-document transmission failed for document {edocument_name}: {e!s}",
@@ -335,6 +330,10 @@ def webhook(**kwargs):
 			}
 		)
 		file_doc.save(ignore_permissions=True)
+
+		# Save EDocument again to trigger field detection (company, etc.) from attached XML
+		edocument.reload()
+		edocument.save(ignore_permissions=True)
 		frappe.db.commit()  # nosemgrep: Webhook must persist before returning
 
 		result = {"edocument": edocument.name, "document_id": document_id}
@@ -356,7 +355,7 @@ def webhook(**kwargs):
 
 
 @frappe.whitelist()
-def poll_incoming_invoices(profile=None, company=None):
+def poll_incoming_invoices(profile: str | None = None, company: str | None = None):
 	"""
 	Poll Recommand inbox for incoming invoices and create EDocument records.
 

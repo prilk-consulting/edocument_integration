@@ -145,23 +145,11 @@ doctype_js = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"edocument_integration.tasks.all"
-# 	],
-# 	"daily": [
-# 		"edocument_integration.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"edocument_integration.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"edocument_integration.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"edocument_integration.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"hourly": [
+		"edocument_integration.tasks.poll_all_incoming_documents",
+	],
+}
 
 # Testing
 # -------
