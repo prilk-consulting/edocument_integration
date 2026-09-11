@@ -21,7 +21,7 @@ class EDocumentIntegrationSettings(Document):
 		base_url: DF.Data | None
 		company: DF.Link | None
 		company_id: DF.Data | None
-		edocument_integrator: DF.Literal["B2B Router", "Recommand"]
+		edocument_integrator: DF.Literal["B2B Router", "Recommand", "Peppyrus"]
 		edocument_profile: DF.Link | None
 	# end: auto-generated types
 
@@ -32,10 +32,6 @@ class EDocumentIntegrationSettings(Document):
 			if document_id:
 				existing = frappe.db.exists("EDocument", {"reference": document_id})
 				if existing:
-					frappe.log_error(
-						f"Duplicate document skipped: EDocument with reference '{document_id}' already exists ({existing})",
-						"Document Processing - Duplicate Skipped",
-					)
 					return {
 						"skipped": True,
 						"reason": "duplicate",
@@ -128,6 +124,10 @@ class EDocumentIntegrationSettings(Document):
 			poll_result = poll_inbox(integration_settings=integration_settings, company_id=self.company_id)
 		elif self.edocument_integrator == "B2B Router":
 			from edocument_integration.b2brouter_api import poll_inbox
+
+			poll_result = poll_inbox(integration_settings=integration_settings, company_id=self.company_id)
+		elif self.edocument_integrator == "Peppyrus":
+			from edocument_integration.peppyrus_api import poll_inbox
 
 			poll_result = poll_inbox(integration_settings=integration_settings, company_id=self.company_id)
 		else:

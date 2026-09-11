@@ -35,7 +35,7 @@
    "fieldname": "edocument_integrator",
    "fieldtype": "Select",
    "label": "EDocument Integrator",
-   "options": "B2B Router\nRecommand"
+   "options": "B2B Router\nRecommand\nPeppyrus"
   },
   {
    "fieldname": "company",
