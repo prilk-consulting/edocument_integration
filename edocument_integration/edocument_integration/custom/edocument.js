@@ -18,7 +18,7 @@ frappe.ui.form.on("EDocument", {
 			} else if (frm.doc.edocument_source_document) {
 				// Check for generated XML file (asynchronous check)
 				frm.call({
-					method: "_has_xml_file",
+					method: "has_xml_file",
 					doc: frm.doc,
 					callback: function (r) {
 						if (r.message) {
