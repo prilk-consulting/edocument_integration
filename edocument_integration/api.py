@@ -171,6 +171,12 @@ def transmit_edocument(edocument_name: str):
 			transmission_result = transmit_invoice(
 				xml_content, invoice_doc=edocument_doc, integration_settings=integration_settings
 			)
+		elif integrator == "Peppyrus":
+			from .peppyrus_api import transmit_invoice
+
+			transmission_result = transmit_invoice(
+				xml_content, invoice_doc=edocument_doc, integration_settings=integration_settings
+			)
 		else:
 			frappe.throw(_("Unsupported E-document integrator: {0}").format(integrator))
 
@@ -376,14 +382,18 @@ def poll_incoming_invoices(profile: str | None = None, company: str | None = Non
 			frappe.throw(_("No integration settings found for profile: {0}").format(profile))
 
 		integrator = integration_settings.get("edocument_integrator")
-		if integrator != "Recommand":
-			frappe.throw(_("Polling incoming invoices is only supported for Recommand integrator."))
+		if integrator == "Recommand":
+			from .recommand_api import poll_inbox
 
-		# Import poll_inbox function
-		from .recommand_api import poll_inbox
+			poll_result = poll_inbox(integration_settings=integration_settings, company_id=company)
+		elif integrator == "Peppyrus":
+			from .peppyrus_api import poll_inbox
 
-		# Poll inbox for incoming invoices
-		poll_result = poll_inbox(integration_settings=integration_settings, company_id=company)
+			poll_result = poll_inbox(integration_settings=integration_settings, company_id=company)
+		else:
+			frappe.throw(
+				_("Polling incoming invoices is only supported for Recommand and Peppyrus integrators.")
+			)
 
 		if not poll_result.get("invoices"):
 			return {

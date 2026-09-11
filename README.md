@@ -1,6 +1,6 @@
 ## EDocument Integration
 
-Integration app for sending and receiving PEPPOL e-documents via service providers (B2B Router, Recommand).
+Integration app for sending and receiving PEPPOL e-documents via service providers (B2B Router, Recommand, Peppyrus).
 
 This app extends the [edocument](https://github.com/prilk-consulting/edocument) app by providing integration capabilities with PEPPOL service providers for:
 - **Sending e-documents**: Transmit PEPPOL invoices and credit notes via API to service providers
@@ -52,12 +52,26 @@ Configure integration with PEPPOL service providers using the **EDocument Integr
    - **EDocument Integrator**: Choose your service provider:
      - **B2B Router**: For B2B Router integration
      - **Recommand**: For Recommand integration
+     - **Peppyrus**: For Peppyrus integration
    - **API Configuration**: Enter your API credentials:
      - **API Key**: Your service provider API key
-     - **API Secret**: Your service provider API secret (for Recommand)
-     - **Base URL**: Your service provider's API base URL
-     - **Account ID**: Your account identifier (for B2B Router, also used as team_id for Recommand)
-     - **Company ID**: Your company identifier (for Recommand)
+     - **API Secret**: Your service provider API secret (Recommand only)
+     - **Base URL**: Your service provider's API base URL. For Peppyrus use `https://api.test.peppyrus.be/v1` for test or `https://api.peppyrus.be/v1` for production.
+     - **Account ID**: Your account identifier for providers that require it, such as B2B Router and Recommand
+     - **Company ID**: Your provider company identifier where required, such as Recommand
+
+### Peppyrus Setup
+
+To use Peppyrus integration:
+
+1. Create or obtain a Peppyrus API key
+2. Set **EDocument Integrator** to **Peppyrus**
+3. Set **API Key** to your Peppyrus key
+4. Set **Base URL** to the Peppyrus environment you want to target:
+   - Test: `https://api.test.peppyrus.be/v1`
+   - Production: `https://api.peppyrus.be/v1`
+
+Peppyrus message transmission uses the participant identifiers embedded in the generated UBL XML, so supplier and customer EndpointID values must be present in the document.
 
 ### Recommand Setup
 
@@ -106,7 +120,7 @@ For receiving incoming documents via polling:
 3. Each document will be automatically processed and create an **EDocument** record
 4. The system will automatically detect the profile and validate the XML
 
-**Automatic Polling**: The app includes a scheduled task that automatically polls for incoming documents every hour. This runs for all active integration settings with Recommand integrator.
+**Automatic Polling**: The app includes a scheduled task that automatically polls for incoming documents every hour. This runs for all active integration settings.
 
 ## Usage
 
@@ -165,6 +179,15 @@ After receiving an incoming document:
   - Support for multiple companies
   - Document verification
   - Transparent pricing
+
+### Peppyrus
+
+- **API Documentation**: [Peppyrus API](https://api.test.peppyrus.be/v1)
+- **Features**:
+  - Send documents via the documented `/message` endpoint
+  - Poll inbox messages via the documented message list/detail endpoints
+  - Validate connectivity using organization information endpoints
+  - Look up recipients in the Peppol directory
 
 ## API Endpoints
 
