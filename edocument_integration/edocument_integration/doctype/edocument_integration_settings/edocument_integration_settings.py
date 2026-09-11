@@ -32,10 +32,6 @@ class EDocumentIntegrationSettings(Document):
 			if document_id:
 				existing = frappe.db.exists("EDocument", {"reference": document_id})
 				if existing:
-					frappe.log_error(
-						f"Duplicate document skipped: EDocument with reference '{document_id}' already exists ({existing})",
-						"Document Processing - Duplicate Skipped",
-					)
 					return {
 						"skipped": True,
 						"reason": "duplicate",
