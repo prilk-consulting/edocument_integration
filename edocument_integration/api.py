@@ -108,7 +108,7 @@ def _validate_edocument_for_transmission(edocument_doc):
 
 
 @frappe.whitelist()
-def get_edocument_integration_settings(profile, company=None):
+def get_edocument_integration_settings(profile: str, company: str | None = None):
 	# Get EDocument Integration Settings for the given profile
 	filters = {"edocument_profile": profile}
 	if company:
@@ -117,19 +117,22 @@ def get_edocument_integration_settings(profile, company=None):
 	docs = frappe.get_list("EDocument Integration Settings", filters=filters, limit_page_length=1)
 
 	if docs:
-		# Get full document to decrypt password field
-		settings_doc = frappe.get_doc("EDocument Integration Settings", docs[0].name)
-		return {
-			"api_key": settings_doc.api_key,
-			"api_secret": settings_doc.get_password("api_secret"),  # Decrypt password field
-			"base_url": settings_doc.base_url,
-			"edocument_integrator": settings_doc.edocument_integrator,
-			"company": settings_doc.company,
-			"account_id": settings_doc.account_id,
-			"company_id": settings_doc.company_id,
-		}
+		return _integration_settings_from_doc(frappe.get_doc("EDocument Integration Settings", docs[0].name))
 
 	return None
+
+
+def _integration_settings_from_doc(settings_doc) -> dict:
+	"""Integration settings with the decrypted API secret, as the provider clients expect."""
+	return {
+		"api_key": settings_doc.api_key,
+		"api_secret": settings_doc.get_password("api_secret"),
+		"base_url": settings_doc.base_url,
+		"edocument_integrator": settings_doc.edocument_integrator,
+		"company": settings_doc.company,
+		"account_id": settings_doc.account_id,
+		"company_id": settings_doc.company_id,
+	}
 
 
 @frappe.whitelist()
@@ -222,13 +225,17 @@ def transmit_edocument(edocument_name: str):
 
 def _handle_recommand_notification(notification: dict) -> dict:
 	"""
-	Handle Recommand webhook notification by fetching actual XML from API.
+	Handle a Recommand webhook notification for a known Recommand team.
+
+	document.received fetches the XML from the API; document.sent comments on the
+	outgoing EDocument; other events are only acknowledged.
 
 	Args:
 		notification: Recommand webhook payload with eventType, documentId, teamId
 
 	Returns:
-		dict with xml_bytes and document_id, or raises exception on error
+		dict with xml_bytes and document_id for document.received, otherwise the event
+		result. Raises ValueError for an unknown team or incomplete payload.
 	"""
 	document_id = notification.get("documentId")
 	team_id = notification.get("teamId")
@@ -247,8 +254,21 @@ def _handle_recommand_notification(notification: dict) -> dict:
 	if not settings:
 		raise ValueError(f"No Recommand integration settings found for team_id: {team_id}")
 
-	# Get full integration settings with decrypted credentials
-	integration_settings = get_edocument_integration_settings(settings.edocument_profile, settings.company)
+	event_type = notification.get("eventType")
+	if event_type != "document.received":
+		edocument = None
+		if event_type == "document.sent":
+			edocument = frappe.db.get_value("EDocument", {"reference": document_id, "direction": "Outgoing"})
+			if edocument:
+				frappe.get_doc("EDocument", edocument).add_comment(
+					"Info", _("Recommand confirmed the document was sent ({0})").format(document_id)
+				)
+		return {"event": event_type, "document_id": document_id, "edocument": edocument}
+
+	# The webhook runs as Guest, so load the team's own settings without a permission check
+	integration_settings = _integration_settings_from_doc(
+		frappe.get_doc("EDocument Integration Settings", settings.name)
+	)
 
 	# Fetch actual XML from Recommand API
 	from .recommand_api import get_recommand_client
@@ -297,8 +317,12 @@ def webhook(**kwargs):
 			data_str = request_data.decode("utf-8") if isinstance(request_data, bytes) else request_data
 			notification = json.loads(data_str)
 
-			if notification.get("eventType") == "document.received":
+			if notification.get("eventType"):
 				result = _handle_recommand_notification(notification)
+				if "xml_bytes" not in result:
+					request_log.status = "Completed"
+					request_log.response = frappe.as_json(result)
+					return {"status": "success", "result": result}, 200
 				xml_bytes = result["xml_bytes"]
 				document_id = result["document_id"]
 		except (json.JSONDecodeError, UnicodeDecodeError):

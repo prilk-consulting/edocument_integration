@@ -110,6 +110,10 @@ For receiving incoming documents via webhook:
    - Create an **EDocument** record
    - Attach the XML file
    - Validate the XML automatically
+4. Recommand notifications are checked against the team ID of a Recommand integration settings record:
+   - `document.received` imports the document as above
+   - `document.sent` adds a comment to the outgoing **EDocument** with that document ID
+   - other events are acknowledged without creating an **EDocument**
 
 ### Polling Configuration
 
