@@ -107,7 +107,6 @@ def _validate_edocument_for_transmission(edocument_doc):
 		)
 
 
-@frappe.whitelist()
 def get_edocument_integration_settings(profile: str, company: str | None = None):
 	# Get EDocument Integration Settings for the given profile
 	filters = {"edocument_profile": profile}
@@ -138,9 +137,10 @@ def _integration_settings_from_doc(settings_doc) -> dict:
 @frappe.whitelist()
 def transmit_edocument(edocument_name: str):
 	# Transmit E-document using the configured integrator
-	try:
-		edocument_doc = frappe.get_doc("EDocument", edocument_name)
+	edocument_doc = frappe.get_doc("EDocument", edocument_name)
+	edocument_doc.check_permission("write")
 
+	try:
 		_validate_edocument_for_transmission(edocument_doc)
 
 		# Get XML content from attached file using EDocument's method
@@ -300,6 +300,15 @@ def webhook(**kwargs):
 		if not request_data:
 			return {"status": "error", "message": "No content found in request"}, 400
 
+		# Only Recommand notifications are accepted: their XML is fetched from the Recommand API,
+		# so an unauthenticated body is never stored. Other providers are polled.
+		try:
+			notification = json.loads(request_data)
+		except (json.JSONDecodeError, UnicodeDecodeError):
+			notification = None
+		if not isinstance(notification, dict) or not notification.get("eventType"):
+			return {"status": "error", "message": "Unsupported webhook payload"}, 400
+
 		from frappe.integrations.utils import create_request_log
 
 		request_log = create_request_log(
@@ -309,40 +318,25 @@ def webhook(**kwargs):
 			request_headers=r.headers,
 		)
 
-		# Try to parse as Recommand JSON notification, otherwise treat as raw XML
-		xml_bytes = None
-		document_id = None
-
 		try:
-			data_str = request_data.decode("utf-8") if isinstance(request_data, bytes) else request_data
-			notification = json.loads(data_str)
-
-			if notification.get("eventType"):
-				result = _handle_recommand_notification(notification)
-				if "xml_bytes" not in result:
-					request_log.status = "Completed"
-					request_log.response = frappe.as_json(result)
-					return {"status": "success", "result": result}, 200
-				xml_bytes = result["xml_bytes"]
-				document_id = result["document_id"]
-		except (json.JSONDecodeError, UnicodeDecodeError):
-			pass  # Not JSON, treat as raw XML
+			result = _handle_recommand_notification(notification)
 		except ValueError as e:
 			frappe.log_error(title="E-Document Webhook Error", message=str(e))
 			return {"status": "error", "message": str(e)}, 400
 
-		# Fallback: treat as raw XML
-		if xml_bytes is None:
-			xml_bytes = request_data.encode("utf-8") if isinstance(request_data, str) else request_data
+		if "xml_bytes" not in result:
+			request_log.status = "Completed"
+			request_log.response = frappe.as_json(result)
+			return {"status": "success", "result": result}, 200
+		xml_bytes = result["xml_bytes"]
+		document_id = result["document_id"]
 
-		# Check for duplicate
-		if document_id:
-			existing = frappe.db.exists("EDocument", {"reference": document_id})
-			if existing:
-				result = {"edocument": existing, "skipped": True, "reason": "duplicate"}
-				request_log.status = "Completed"
-				request_log.response = frappe.as_json(result)
-				return {"status": "success", "result": result}, 200
+		existing = frappe.db.exists("EDocument", {"reference": document_id})
+		if existing:
+			result = {"edocument": existing, "skipped": True, "reason": "duplicate"}
+			request_log.status = "Completed"
+			request_log.response = frappe.as_json(result)
+			return {"status": "success", "result": result}, 200
 
 		# Create EDocument and attach XML
 		edocument = frappe.get_doc({"doctype": "EDocument", "reference": document_id})

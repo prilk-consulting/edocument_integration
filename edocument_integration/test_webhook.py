@@ -9,7 +9,7 @@ from frappe.tests import IntegrationTestCase
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
-from edocument_integration.api import webhook
+from edocument_integration.api import transmit_edocument, webhook
 
 DOCUMENT_ID = "doc_TEST_WEBHOOK_0001"
 TEAM_ID = "team_TEST_WEBHOOK"
@@ -46,12 +46,9 @@ class TestWebhookEvents(IntegrationTestCase):
 			{"doctype": "EDocument", "direction": "Outgoing", "reference": DOCUMENT_ID}
 		).insert(ignore_permissions=True)
 
-	def _post(self, payload):
-		request = Request(
-			EnvironBuilder(
-				method="POST", data=json.dumps(payload), content_type="application/json"
-			).get_environ()
-		)
+	def _post(self, payload, content_type="application/json"):
+		data = payload if isinstance(payload, str) else json.dumps(payload)
+		request = Request(EnvironBuilder(method="POST", data=data, content_type=content_type).get_environ())
 		with patch.object(frappe.local, "request", request, create=True):
 			return webhook()
 
@@ -117,3 +114,16 @@ class TestWebhookEvents(IntegrationTestCase):
 		self.assertEqual(status, 200)
 		self.assertEqual(get_recommand_client.call_args.args[0]["api_secret"], "test-secret")
 		self.assertTrue(frappe.db.exists("EDocument", {"reference": RECEIVED_DOCUMENT_ID}))
+
+	def test_raw_xml_body_is_rejected(self):
+		count_before = self._edocument_count()
+
+		with self.set_user("Guest"):
+			_response, status = self._post(PEPPOL_INVOICE_XML, content_type="application/xml")
+
+		self.assertEqual(status, 400)
+		self.assertEqual(self._edocument_count(), count_before)
+
+	def test_transmit_needs_write_permission(self):
+		with self.set_user("Guest"):
+			self.assertRaises(frappe.PermissionError, transmit_edocument, self.outgoing.name)
