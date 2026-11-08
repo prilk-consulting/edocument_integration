@@ -101,9 +101,9 @@ In the Recommand dashboard, you can:
 
 ### Webhook Configuration
 
-For receiving incoming documents via webhook:
+The webhook accepts Recommand notifications only. Other providers are polled hourly.
 
-1. Configure your webhook URL in your service provider's dashboard
+1. Configure your webhook URL in your Recommand dashboard
 2. The webhook URL format is: `https://your-domain.com/api/method/edocument_integration.api.webhook`
 3. The webhook will automatically:
    - Detect the document profile from XML
@@ -201,11 +201,11 @@ After receiving an incoming document:
 
 **Method**: POST
 
-**Description**: Receives incoming documents from service providers
+**Description**: Receives Recommand notifications. For `document.received`, the XML is fetched from the Recommand API, never taken from the request body.
 
-**Authentication**: Public endpoint (configured in service provider dashboard)
+**Authentication**: Public endpoint; the `teamId` must match a Recommand integration settings record
 
-**Request Body**: PEPPOL UBL XML document
+**Request Body**: Recommand JSON notification (`eventType`, `documentId`, `teamId`)
 
 **Response**: 
 ```json
